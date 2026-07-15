@@ -20,6 +20,14 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+
       - name: Generate Debug Keystore
         run: |
           keytool -genkey -v \
