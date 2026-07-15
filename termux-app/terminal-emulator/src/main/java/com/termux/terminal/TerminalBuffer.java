@@ -228,10 +228,26 @@ public final class TerminalBuffer {
                     lastNonSpaceIndex = oldLine.getSpaceUsed();
                     if (cursorAtThisRow) justToCursor = true;
                 } else {
-                    for (int i = 0; i < oldLine.getSpaceUsed(); i++)
-                        // NEWLY INTRODUCED BUG! Should not index oldLine.mStyle with char indices
-                        if (oldLine.mText[i] != ' '/* || oldLine.mStyle[i] != currentStyle */)
-                            lastNonSpaceIndex = i + 1;
+                    // Fixed: properly track column index for style checking
+                    int currentColumn = 0;
+                    for (int i = 0; i < oldLine.getSpaceUsed(); ) {
+                        char c = oldLine.mText[i++];
+                        int codePoint;
+                        if (Character.isHighSurrogate(c) && i < oldLine.getSpaceUsed()) {
+                            codePoint = Character.toCodePoint(c, oldLine.mText[i++]);
+                        } else {
+                            codePoint = c;
+                        }
+                        // Check both text and style - style uses column index, not char index
+                        if (c != ' ' || oldLine.getStyle(currentColumn) != currentStyle) {
+                            lastNonSpaceIndex = i;
+                        }
+                        // Advance column only for non-combining characters
+                        int displayWidth = WcWidth.width(codePoint);
+                        if (displayWidth > 0) {
+                            currentColumn++;
+                        }
+                    }
                 }
 
                 int currentOldCol = 0;
@@ -239,7 +255,12 @@ public final class TerminalBuffer {
                 for (int i = 0; i < lastNonSpaceIndex; i++) {
                     // Note that looping over java character, not cells.
                     char c = oldLine.mText[i];
-                    int codePoint = (Character.isHighSurrogate(c)) ? Character.toCodePoint(c, oldLine.mText[++i]) : c;
+                    int codePoint;
+                    if (Character.isHighSurrogate(c) && (i + 1 < lastNonSpaceIndex)) {
+                        codePoint = Character.toCodePoint(c, oldLine.mText[++i]);
+                    } else {
+                        codePoint = c;
+                    }
                     int displayWidth = WcWidth.width(codePoint);
                     // Use the last style if this is a zero-width character:
                     if (displayWidth > 0) styleAtCol = oldLine.getStyle(currentOldCol);

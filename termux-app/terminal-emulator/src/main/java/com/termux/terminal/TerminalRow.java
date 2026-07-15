@@ -32,6 +32,11 @@ public final class TerminalRow {
         clear(style);
     }
 
+    /** Fast surrogate detection using bitwise operations instead of Character.isHighSurrogate() */
+    private static boolean isHighSurrogate(char c) {
+        return (c & 0xfc00) == 0xd800;
+    }
+
     /** NOTE: The sourceX2 is exclusive. */
     public void copyInterval(TerminalRow line, int sourceX1, int sourceX2, int destinationX) {
         mHasNonOneWidthOrSurrogateChars |= line.mHasNonOneWidthOrSurrogateChars;
@@ -42,7 +47,12 @@ public final class TerminalRow {
         int latestNonCombiningWidth = 0;
         for (int i = x1; i < x2; i++) {
             char sourceChar = sourceChars[i];
-            int codePoint = Character.isHighSurrogate(sourceChar) ? Character.toCodePoint(sourceChar, sourceChars[++i]) : sourceChar;
+            int codePoint;
+            if (isHighSurrogate(sourceChar) && (i + 1 < sourceChars.length)) {
+                codePoint = Character.toCodePoint(sourceChar, sourceChars[++i]);
+            } else {
+                codePoint = sourceChar;
+            }
             if (startingFromSecondHalfOfWideChar) {
                 // Just treat copying second half of wide char as copying whitespace.
                 codePoint = ' ';
@@ -71,21 +81,25 @@ public final class TerminalRow {
         while (true) { // 0<2 1 < 2
             int newCharIndex = currentCharIndex;
             char c = mText[newCharIndex++]; // cci=1, cci=2
-            boolean isHigh = Character.isHighSurrogate(c);
-            int codePoint = isHigh ? Character.toCodePoint(c, mText[newCharIndex++]) : c;
+            int codePoint;
+            if (isHighSurrogate(c) && newCharIndex < mSpaceUsed) {
+                codePoint = Character.toCodePoint(c, mText[newCharIndex++]);
+            } else {
+                codePoint = c;
+            }
             int wcwidth = WcWidth.width(codePoint); // 1, 2
             if (wcwidth > 0) {
                 currentColumn += wcwidth;
                 if (currentColumn == column) {
                     while (newCharIndex < mSpaceUsed) {
                         // Skip combining chars.
-                        if (Character.isHighSurrogate(mText[newCharIndex])) {
+                        if (isHighSurrogate(mText[newCharIndex]) && (newCharIndex + 1 < mSpaceUsed)) {
                             if (WcWidth.width(Character.toCodePoint(mText[newCharIndex], mText[newCharIndex + 1])) <= 0) {
                                 newCharIndex += 2;
                             } else {
                                 break;
                             }
-                        } else if (WcWidth.width(mText[newCharIndex]) <= 0) {
+                        } else if (newCharIndex < mSpaceUsed && WcWidth.width(mText[newCharIndex]) <= 0) {
                             newCharIndex++;
                         } else {
                             break;
@@ -104,7 +118,12 @@ public final class TerminalRow {
     private boolean wideDisplayCharacterStartingAt(int column) {
         for (int currentCharIndex = 0, currentColumn = 0; currentCharIndex < mSpaceUsed; ) {
             char c = mText[currentCharIndex++];
-            int codePoint = Character.isHighSurrogate(c) ? Character.toCodePoint(c, mText[currentCharIndex++]) : c;
+            int codePoint;
+            if (isHighSurrogate(c) && currentCharIndex < mSpaceUsed) {
+                codePoint = Character.toCodePoint(c, mText[currentCharIndex++]);
+            } else {
+                codePoint = c;
+            }
             int wcwidth = WcWidth.width(codePoint);
             if (wcwidth > 0) {
                 if (currentColumn == column && wcwidth == 2) return true;
@@ -204,6 +223,9 @@ public final class TerminalRow {
 
         if (oldCodePointDisplayWidth == 2 && newCodePointDisplayWidth == 1) {
             // Replace second half of wide char with a space. Which mean that we actually add a ' ' java character.
+            if (newNextColumnIndex >= text.length) {
+                throw new IllegalStateException("Invalid index: " + newNextColumnIndex + ", text.length: " + text.length);
+            }
             if (mSpaceUsed + 1 > text.length) {
                 char[] newText = new char[text.length + mColumns];
                 System.arraycopy(text, 0, newText, 0, newNextColumnIndex);
@@ -224,7 +246,7 @@ public final class TerminalRow {
             } else {
                 // Overwrite the contents of the next column, which mean we actually remove java characters. Due to the
                 // check at the beginning of this method we know that we are not overwriting a wide char.
-                int newNextNextColumnIndex = newNextColumnIndex + (Character.isHighSurrogate(mText[newNextColumnIndex]) ? 2 : 1);
+                int newNextNextColumnIndex = newNextColumnIndex + ((newNextColumnIndex < text.length && isHighSurrogate(mText[newNextColumnIndex])) ? 2 : 1);
                 int nextLen = newNextNextColumnIndex - newNextColumnIndex;
 
                 // Shift the array leftwards.
