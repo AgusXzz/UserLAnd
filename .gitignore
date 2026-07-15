@@ -1,54 +1,58 @@
 ```
-# Gradle
-.gradle/
-build/
-target/
-
 # Dependencies
+.gradle/
 node_modules/
-vendor/
+
+# Build artifacts
+build/
+dist/
+target/
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-env/
-venv/
+*.py.class
+*.py.obj
 .venv/
-.ENV
-.pytest_cache/
-.mypy_cache/
-.coverage
+venv/
+.env
+.env.local
+.env.*
+
+# Java/Android
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.hprof
+*.dump
+*.pid
+*.log
+*.swp
+*.swo
+*.tmp
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
 
 # Logs
 *.log
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# Environment variables
-.env
-.env.local
-*.env.*
-
-# Coverage reports
+# Coverage
 coverage/
 htmlcov/
+.coverage
 
 # Compressed files
 *.zip
