@@ -452,7 +452,7 @@ public final class WcWidth {
     /** The width at an index position in a java char array. */
     public static int width(char[] chars, int index) {
         char c = chars[index];
-        if (Character.isHighSurrogate(c) && (index + 1 < chars.length)) {
+        if (Character.isHighSurrogate(c) && index + 1 < chars.length && Character.isLowSurrogate(chars[index + 1])) {
             return width(Character.toCodePoint(c, chars[index + 1]));
         } else {
             return width(c);
