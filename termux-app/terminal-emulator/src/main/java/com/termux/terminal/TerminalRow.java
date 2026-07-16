@@ -37,6 +37,17 @@ public final class TerminalRow {
         return (c & 0xfc00) == 0xd800;
     }
 
+    /**
+     * Return whether {@code chars[index]} starts a complete UTF-16 surrogate pair inside the active text range.
+     *
+     * <p>Rows may temporarily contain malformed input from a pty stream or from previously-corrupt state. Treating an
+     * unpaired high surrogate as a complete code point would read past the row and crash the terminal renderer, so all
+     * callers use this guard before consuming the low surrogate.
+     */
+    private static boolean startsCompleteSurrogatePair(char[] chars, int index, int limit) {
+        return index + 1 < limit && isHighSurrogate(chars[index]) && Character.isLowSurrogate(chars[index + 1]);
+    }
+
     /** NOTE: The sourceX2 is exclusive. */
     public void copyInterval(TerminalRow line, int sourceX1, int sourceX2, int destinationX) {
         mHasNonOneWidthOrSurrogateChars |= line.mHasNonOneWidthOrSurrogateChars;
@@ -48,7 +59,7 @@ public final class TerminalRow {
         for (int i = x1; i < x2; i++) {
             char sourceChar = sourceChars[i];
             int codePoint;
-            if (isHighSurrogate(sourceChar) && (i + 1 < sourceChars.length)) {
+            if (startsCompleteSurrogatePair(sourceChars, i, x2)) {
                 codePoint = Character.toCodePoint(sourceChar, sourceChars[++i]);
             } else {
                 codePoint = sourceChar;
@@ -82,7 +93,7 @@ public final class TerminalRow {
             int newCharIndex = currentCharIndex;
             char c = mText[newCharIndex++]; // cci=1, cci=2
             int codePoint;
-            if (isHighSurrogate(c) && newCharIndex < mSpaceUsed) {
+            if (startsCompleteSurrogatePair(mText, currentCharIndex, mSpaceUsed)) {
                 codePoint = Character.toCodePoint(c, mText[newCharIndex++]);
             } else {
                 codePoint = c;
@@ -93,7 +104,7 @@ public final class TerminalRow {
                 if (currentColumn == column) {
                     while (newCharIndex < mSpaceUsed) {
                         // Skip combining chars.
-                        if (isHighSurrogate(mText[newCharIndex]) && (newCharIndex + 1 < mSpaceUsed)) {
+                        if (startsCompleteSurrogatePair(mText, newCharIndex, mSpaceUsed)) {
                             if (WcWidth.width(Character.toCodePoint(mText[newCharIndex], mText[newCharIndex + 1])) <= 0) {
                                 newCharIndex += 2;
                             } else {
@@ -119,7 +130,7 @@ public final class TerminalRow {
         for (int currentCharIndex = 0, currentColumn = 0; currentCharIndex < mSpaceUsed; ) {
             char c = mText[currentCharIndex++];
             int codePoint;
-            if (isHighSurrogate(c) && currentCharIndex < mSpaceUsed) {
+            if (startsCompleteSurrogatePair(mText, currentCharIndex - 1, mSpaceUsed)) {
                 codePoint = Character.toCodePoint(c, mText[currentCharIndex++]);
             } else {
                 codePoint = c;
@@ -246,7 +257,7 @@ public final class TerminalRow {
             } else {
                 // Overwrite the contents of the next column, which mean we actually remove java characters. Due to the
                 // check at the beginning of this method we know that we are not overwriting a wide char.
-                int newNextNextColumnIndex = newNextColumnIndex + ((newNextColumnIndex < text.length && isHighSurrogate(mText[newNextColumnIndex])) ? 2 : 1);
+                int newNextNextColumnIndex = newNextColumnIndex + (startsCompleteSurrogatePair(text, newNextColumnIndex, mSpaceUsed) ? 2 : 1);
                 int nextLen = newNextNextColumnIndex - newNextColumnIndex;
 
                 // Shift the array leftwards.

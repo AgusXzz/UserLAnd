@@ -2,6 +2,7 @@ package com.termux.terminal;
 
 import junit.framework.TestCase;
 
+import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -29,6 +30,12 @@ public class TerminalRowTest extends TestCase {
 	protected void setUp() throws Exception {
 		super.setUp();
 		row = new TerminalRow(COLUMNS, TextStyle.NORMAL);
+	}
+
+	private void setSpaceUsedForTest(int spaceUsed) throws Exception {
+		Field spaceUsedField = TerminalRow.class.getDeclaredField("mSpaceUsed");
+		spaceUsedField.setAccessible(true);
+		spaceUsedField.setShort(row, (short) spaceUsed);
 	}
 
 	private void assertLineStartsWith(int... codePoints) {
@@ -402,6 +409,19 @@ public class TerminalRowTest extends TestCase {
 		// }
 		// assertEquals("At index=" + i + ", charIndex=" + charIndex + ", char=" + (char) thisPoint, points[i], thisPoint);
 		// }
+	}
+
+	public void testMalformedTrailingHighSurrogateDoesNotCrash() throws Exception {
+		row.mText[0] = Character.highSurrogate(TWO_JAVA_CHARS_DISPLAY_WIDTH_ONE_1);
+		setSpaceUsedForTest(1);
+
+		assertEquals(1, WcWidth.width(row.mText, 0));
+		assertEquals(0, row.findStartOfColumn(0));
+		assertEquals(1, row.findStartOfColumn(1));
+
+		TerminalRow destination = new TerminalRow(COLUMNS, TextStyle.NORMAL);
+		destination.copyInterval(row, 0, 1, 0);
+		assertEquals(row.mText[0], destination.mText[0]);
 	}
 
 	public void testNormalization() {
