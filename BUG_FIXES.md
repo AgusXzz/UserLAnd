@@ -1,4 +1,4 @@
-# Bug Fixes untuk Termux Terminal Emulator
+ # Bug Fixes untuk Termux Terminal Emulator
 
 ## Ringkasan Eksekutif
 
